@@ -1,0 +1,117 @@
+name: Auto Assign
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, synchronize, edited]
+
+jobs:
+  # ─── Job 1: issue 和 PR 打开时，自动分配给 su600 ───────────────────────
+  auto-assign-issue:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' || github.event.action == 'opened'
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: 'Auto-assign issue or PR'
+        uses: pozil/auto-assign-issue@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          assignees: su600
+          numOfAssignee: 1
+
+  # ─── Job 2: 检测 Copilot 是否向 PR 推了 commit，打上标记 label ──────────
+  mark-copilot-committed:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if latest commit is by Copilot
+        id: check_author
+        run: |
+          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+          AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
+          echo "Latest commit author: $AUTHOR_NAME <$AUTHOR_EMAIL>"
+          # Copilot coding agent 的提交者邮箱包含 copilot 或来自 github.com bot
+          if echo "$AUTHOR_EMAIL" | grep -iqE "copilot|github-copilot"; then
+            echo "is_copilot=true" >> $GITHUB_OUTPUT
+          elif echo "$AUTHOR_NAME" | grep -iqE "copilot"; then
+            echo "is_copilot=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_copilot=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add label to mark Copilot has committed
+        if: steps.check_author.outputs.is_copilot == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // 确保 label 存在
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'copilot-committed',
+                color: '0075ca',
+                description: 'Copilot has pushed commits to this PR'
+              });
+            } catch (e) {
+              // label 已存在则忽略
+            }
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['copilot-committed']
+            });
+
+  # ─── Job 3: PR 标题从含 [WIP] 改为不含 [WIP]，且 Copilot 已提交过，请求 Review ──
+  request-review-on-wip-removed:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'edited' &&
+      github.event.changes.title != null &&
+      !contains(github.event.pull_request.title, '[WIP]') &&
+      !contains(github.event.pull_request.title, '[wip]')
+    permissions:
+      pull-requests: write
+      issues: read
+    steps:
+      - name: Check if copilot-committed label exists on this PR
+        id: check_label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            const hasCopilotLabel = labels.some(l => l.name === 'copilot-committed');
+            core.setOutput('has_label', hasCopilotLabel ? 'true' : 'false');
+
+      - name: Request review from su600
+        if: steps.check_label.outputs.has_label == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              reviewers: ['su600']
+            });
+            console.log('✅ Review requested from su600');
