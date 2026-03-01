@@ -2,16 +2,13 @@ name: Auto Assign
 
 on:
   pull_request:
-    types: [synchronize, edited]
+    types: [synchronize]
 
 jobs:
-  # ── Job 1: Copilot 推 commit 时，打上 copilot-committed label ──
-  mark-copilot-committed:
+  request-review-on-copilot-commit:
     runs-on: ubuntu-latest
-    if: github.event.action == 'synchronize'
     permissions:
       pull-requests: write
-      issues: write
       contents: read
     steps:
       - name: Checkout
@@ -33,68 +30,16 @@ jobs:
             echo "is_copilot=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Add copilot-committed label
+      - name: Request review from su600
         if: steps.check_author.outputs.is_copilot == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const owner = context.repo.owner;
-            const repo  = context.repo.repo;
-            const pr_number = context.payload.pull_request.number;
-
-            try {
-              await github.rest.issues.createLabel({
-                owner, repo,
-                name: 'copilot-committed',
-                color: '0075ca',
-                description: 'Copilot has pushed commits to this PR'
-              });
-            } catch (e) { /* label 已存在则忽略 */ }
-
-            await github.rest.issues.addLabels({ owner, repo, issue_number: pr_number, labels: ['copilot-committed'] });
-            console.log('✅ Label copilot-committed added');
-
-  # ── Job 2: Copilot 去掉 [WIP] 时，等待 label 打上后请求 Review ──
-  request-review-on-wip-removed:
-    runs-on: ubuntu-latest
-    if: |
-      github.event.action == 'edited' &&
-      github.event.changes.title != null &&
-      !contains(github.event.pull_request.title, '[WIP]') &&
-      !contains(github.event.pull_request.title, '[wip]')
-    permissions:
-      pull-requests: write
-      issues: read
-    steps:
-      - name: Wait for copilot-committed label then request review
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo  = context.repo.repo;
-            const pr_number = context.payload.pull_request.number;
-
-            // 轮询等待 copilot-committed label，最多等 30 秒
-            const maxWait = 30;
-            const interval = 10;
-            let elapsed = 0;
-            let hasCopilotLabel = false;
-
-            while (elapsed <= maxWait) {
-              const { data: labels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr_number });
-              hasCopilotLabel = labels.some(l => l.name === 'copilot-committed');
-              if (hasCopilotLabel) break;
-
-              console.log(`⏳ copilot-committed label not found yet, waiting ${interval}s... (${elapsed}s elapsed)`);
-              await new Promise(r => setTimeout(r, interval * 1000));
-              elapsed += interval;
-            }
-
-            if (hasCopilotLabel) {
-              await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr_number, reviewers: ['su600'] });
-              console.log('✅ Review requested from su600');
-            } else {
-              console.log('ℹ️ copilot-committed label not found after waiting, skipping review request');
-            }
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              reviewers: ['su600']
+            });
+            console.log('✅ Review requested from su600');
