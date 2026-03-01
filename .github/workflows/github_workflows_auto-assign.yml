@@ -1,31 +1,13 @@
 name: Auto Assign
 
 on:
-  issues:
-    types: [opened]
   pull_request:
-    types: [opened, synchronize, edited]
+    types: [synchronize, edited]
 
 jobs:
-  # ─── Job 1: issue 和 PR 打开时，自动分配给 su600 ───────────────────────
-  auto-assign-issue:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'issues' || github.event.action == 'opened'
-    permissions:
-      issues: write
-      pull-requests: write
-    steps:
-      - name: 'Auto-assign issue or PR'
-        uses: pozil/auto-assign-issue@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          assignees: su600
-          numOfAssignee: 1
-
-  # ─── Job 2: 处理 Copilot commit 标记 & Review 请求（两个条件都满足才请求）──
+  # 处理 Copilot commit 标记 & Review 请求（两个条件都满足才请求）
   copilot-workflow:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (github.event.action == 'synchronize' || github.event.action == 'edited')
     permissions:
       pull-requests: write
       issues: write
