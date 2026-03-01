@@ -539,7 +539,8 @@ footer {
 
 .category-filters,
 .day-filters,
-.time-filters {
+.time-filters,
+.group-by-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -547,7 +548,8 @@ footer {
 
 .category-filter,
 .day-filter,
-.time-filter {
+.time-filter,
+.group-by-filter {
   background-color: var(--background);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -560,7 +562,8 @@ footer {
 
 .category-filter.active,
 .day-filter.active,
-.time-filter.active {
+.time-filter.active,
+.group-by-filter.active {
   background-color: var(--primary);
   color: white;
   border-color: var(--primary-dark);
@@ -568,9 +571,34 @@ footer {
 
 .category-filter:hover,
 .day-filter:hover,
-.time-filter:hover {
+.time-filter:hover,
+.group-by-filter:hover {
   background-color: var(--primary-light);
   color: white;
+}
+
+/* Grouped activities layout */
+#activities-list.grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.activity-group-header {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--primary);
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  border-left: 4px solid var(--primary);
+  background-color: var(--background);
+  border-radius: 0 4px 4px 0;
+}
+
+.activity-group-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
 }
 
 .time-filters {
