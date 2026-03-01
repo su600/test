@@ -15,6 +15,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const dayFilters = document.querySelectorAll(".day-filter");
   const timeFilters = document.querySelectorAll(".time-filter");
 
+  // View toggle elements
+  const cardViewBtn = document.getElementById("card-view-btn");
+  const calendarViewBtn = document.getElementById("calendar-view-btn");
+
   // Authentication elements
   const loginButton = document.getElementById("login-button");
   const userInfo = document.getElementById("user-info");
@@ -40,6 +44,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchQuery = "";
   let currentDay = "";
   let currentTimeRange = "";
+  let currentView = "card";
+
+  // Calendar view constants
+  const CALENDAR_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const CALENDAR_START_HOUR = 6;
+  const CALENDAR_END_HOUR = 18;
+  const PX_PER_MINUTE = 1.5;
 
   // Authentication state
   let currentUser = null;
@@ -258,6 +269,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function showLoadingSkeletons() {
     activitiesList.innerHTML = "";
 
+    if (currentView === "calendar") {
+      activitiesList.innerHTML = '<p style="padding:20px;color:var(--text-secondary);">Loading calendar...</p>';
+      return;
+    }
+
     // Create more skeleton cards to fill the screen since they're smaller now
     for (let i = 0; i < 9; i++) {
       const skeletonCard = document.createElement("div");
@@ -467,9 +483,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Display filtered activities
-    Object.entries(filteredActivities).forEach(([name, details]) => {
-      renderActivityCard(name, details);
-    });
+    if (currentView === "calendar") {
+      renderCalendarView(filteredActivities);
+    } else {
+      Object.entries(filteredActivities).forEach(([name, details]) => {
+        renderActivityCard(name, details);
+      });
+    }
   }
 
   // Function to render a single activity card
@@ -588,6 +608,198 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     activitiesList.appendChild(activityCard);
+  }
+
+  // View toggle handlers
+  cardViewBtn.addEventListener("click", () => {
+    currentView = "card";
+    cardViewBtn.classList.add("active");
+    calendarViewBtn.classList.remove("active");
+    activitiesList.classList.remove("calendar-mode");
+    displayFilteredActivities();
+  });
+
+  calendarViewBtn.addEventListener("click", () => {
+    currentView = "calendar";
+    calendarViewBtn.classList.add("active");
+    cardViewBtn.classList.remove("active");
+    activitiesList.classList.add("calendar-mode");
+    displayFilteredActivities();
+  });
+
+  // Convert "HH:MM" time string to minutes from midnight
+  function timeStrToMinutes(timeStr) {
+    const [h, m] = timeStr.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  // Assign non-overlapping column positions to activities within a day
+  function computeColumns(dayActivities) {
+    if (dayActivities.length === 0) return [];
+
+    const acts = dayActivities
+      .map((a) => ({
+        name: a.name,
+        details: a.details,
+        startMin: timeStrToMinutes(a.details.schedule_details.start_time),
+        endMin: timeStrToMinutes(a.details.schedule_details.end_time),
+        column: 0,
+        totalColumns: 1,
+      }))
+      .sort((a, b) => a.startMin - b.startMin);
+
+    // Greedy column assignment
+    const colEndTimes = [];
+    acts.forEach((act) => {
+      let placed = false;
+      for (let i = 0; i < colEndTimes.length; i++) {
+        if (act.startMin >= colEndTimes[i]) {
+          act.column = i;
+          colEndTimes[i] = act.endMin;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        act.column = colEndTimes.length;
+        colEndTimes.push(act.endMin);
+      }
+    });
+
+    // Compute each activity's totalColumns based on its overlapping group
+    acts.forEach((actA) => {
+      const overlapping = acts.filter(
+        (actB) =>
+          actB !== actA &&
+          actB.startMin < actA.endMin &&
+          actB.endMin > actA.startMin
+      );
+      const groupCols = new Set(overlapping.map((a) => a.column));
+      groupCols.add(actA.column);
+      actA.totalColumns = groupCols.size;
+    });
+
+    return acts;
+  }
+
+  // Render activities in calendar (week) view
+  function renderCalendarView(filteredActivities) {
+    activitiesList.classList.add("calendar-mode");
+    activitiesList.innerHTML = "";
+
+    // Group activities by day
+    const byDay = {};
+    CALENDAR_DAYS.forEach((d) => (byDay[d] = []));
+
+    Object.entries(filteredActivities).forEach(([name, details]) => {
+      if (!details.schedule_details) return;
+      details.schedule_details.days.forEach((day) => {
+        if (byDay[day] !== undefined) {
+          byDay[day].push({ name, details });
+        }
+      });
+    });
+
+    // Compute column layout for each day
+    const dayLayouts = {};
+    CALENDAR_DAYS.forEach((day) => {
+      dayLayouts[day] = computeColumns(byDay[day]);
+    });
+
+    const calendarStartMin = CALENDAR_START_HOUR * 60;
+    const calendarEndMin = CALENDAR_END_HOUR * 60;
+    const totalHeightPx = (calendarEndMin - calendarStartMin) * PX_PER_MINUTE;
+
+    const calendarEl = document.createElement("div");
+    calendarEl.className = "calendar-view";
+
+    // Header row (day names)
+    const headerEl = document.createElement("div");
+    headerEl.className = "cal-header";
+
+    const gutterEl = document.createElement("div");
+    gutterEl.className = "cal-gutter-cell";
+    headerEl.appendChild(gutterEl);
+
+    CALENDAR_DAYS.forEach((day) => {
+      const cell = document.createElement("div");
+      cell.className = "cal-day-header";
+      cell.textContent = day.substring(0, 3);
+      headerEl.appendChild(cell);
+    });
+    calendarEl.appendChild(headerEl);
+
+    // Calendar body (time gutter + day columns)
+    const bodyEl = document.createElement("div");
+    bodyEl.className = "cal-body";
+
+    // Time gutter
+    const timeGutterEl = document.createElement("div");
+    timeGutterEl.className = "cal-time-gutter";
+    timeGutterEl.style.height = `${totalHeightPx}px`;
+
+    for (let h = CALENDAR_START_HOUR; h <= CALENDAR_END_HOUR; h++) {
+      const labelEl = document.createElement("div");
+      labelEl.className = "cal-time-label";
+      const offsetPx = (h * 60 - calendarStartMin) * PX_PER_MINUTE;
+      labelEl.style.top = `${offsetPx}px`;
+      const period = h >= 12 ? "PM" : "AM";
+      const displayH = h % 12 || 12;
+      labelEl.textContent = `${displayH}${period}`;
+      timeGutterEl.appendChild(labelEl);
+    }
+    bodyEl.appendChild(timeGutterEl);
+
+    // Day columns
+    CALENDAR_DAYS.forEach((day) => {
+      const dayColEl = document.createElement("div");
+      dayColEl.className = "cal-day-col";
+      dayColEl.style.height = `${totalHeightPx}px`;
+
+      // Horizontal hour grid lines
+      for (let h = CALENDAR_START_HOUR; h <= CALENDAR_END_HOUR; h++) {
+        const lineEl = document.createElement("div");
+        lineEl.className = "cal-hour-line";
+        lineEl.style.top = `${(h * 60 - calendarStartMin) * PX_PER_MINUTE}px`;
+        dayColEl.appendChild(lineEl);
+      }
+
+      // Activity blocks
+      dayLayouts[day].forEach((act) => {
+        const topPx = (act.startMin - calendarStartMin) * PX_PER_MINUTE;
+        const heightPx = Math.max((act.endMin - act.startMin) * PX_PER_MINUTE, 24);
+        const widthPct = 100 / act.totalColumns;
+        const leftPct = act.column * widthPct;
+        const actType = getActivityType(act.name, act.details.description);
+        const enrolled = act.details.participants.length;
+        const total = act.details.max_participants;
+
+        const actEl = document.createElement("div");
+        actEl.className = `cal-activity cal-activity-${actType}`;
+        actEl.style.top = `${topPx}px`;
+        actEl.style.height = `${heightPx}px`;
+        actEl.style.width = `calc(${widthPct}% - 4px)`;
+        actEl.style.left = `calc(${leftPct}% + 2px)`;
+
+        actEl.innerHTML = `
+          <div class="cal-act-name">${act.name}</div>
+          <div class="cal-act-count">${enrolled}/${total}</div>
+          <div class="cal-act-tooltip">
+            <strong>${act.name}</strong><br>
+            ${act.details.description}<br>
+            <em>${formatSchedule(act.details)}</em><br>
+            ${enrolled} enrolled &bull; ${total - enrolled} spots left
+          </div>
+        `;
+
+        dayColEl.appendChild(actEl);
+      });
+
+      bodyEl.appendChild(dayColEl);
+    });
+
+    calendarEl.appendChild(bodyEl);
+    activitiesList.appendChild(calendarEl);
   }
 
   // Event listeners for search and filter

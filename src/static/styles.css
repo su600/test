@@ -664,3 +664,207 @@ footer {
 #logout-button:hover {
   background-color: rgba(255, 255, 255, 0.3);
 }
+
+/* View toggle buttons */
+.view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  justify-content: flex-end;
+}
+
+.view-btn {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-btn.active {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary-dark);
+}
+
+.view-btn:hover:not(.active) {
+  background-color: var(--primary-light);
+  color: white;
+}
+
+/* Calendar mode overrides the grid layout */
+#activities-list.calendar-mode {
+  display: block;
+}
+
+/* Calendar view container */
+.calendar-view {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+/* Calendar header (day names row) */
+.cal-header {
+  display: grid;
+  grid-template-columns: 44px repeat(7, 1fr);
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+  min-width: 560px;
+}
+
+.cal-gutter-cell {
+  border-right: 1px solid var(--border);
+}
+
+.cal-day-header {
+  padding: 6px 4px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.78rem;
+  color: var(--primary);
+  border-right: 1px solid var(--border-light);
+}
+
+.cal-day-header:last-child {
+  border-right: none;
+}
+
+/* Calendar body grid */
+.cal-body {
+  display: grid;
+  grid-template-columns: 44px repeat(7, 1fr);
+  min-width: 560px;
+}
+
+/* Time gutter column */
+.cal-time-gutter {
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+
+.cal-time-label {
+  position: absolute;
+  right: 4px;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Individual day columns */
+.cal-day-col {
+  position: relative;
+  border-right: 1px solid var(--border-light);
+  overflow: visible;
+}
+
+.cal-day-col:last-child {
+  border-right: none;
+}
+
+/* Hour grid lines */
+.cal-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--border-light);
+  pointer-events: none;
+}
+
+/* Activity blocks on the calendar */
+.cal-activity {
+  position: absolute;
+  border-radius: 4px;
+  padding: 3px 5px;
+  overflow: visible;
+  cursor: pointer;
+  font-size: 0.7rem;
+  z-index: 2;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.15s ease;
+}
+
+.cal-activity:hover {
+  z-index: 50;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Category colour variants */
+.cal-activity-sports {
+  background-color: #c8e6c9;
+  border-left: 3px solid #2e7d32;
+  color: #1b5e20;
+}
+
+.cal-activity-arts {
+  background-color: #e1bee7;
+  border-left: 3px solid #7b1fa2;
+  color: #4a148c;
+}
+
+.cal-activity-academic {
+  background-color: #bbdefb;
+  border-left: 3px solid #1565c0;
+  color: #0d47a1;
+}
+
+.cal-activity-community {
+  background-color: #ffe0b2;
+  border-left: 3px solid #e65100;
+  color: #bf360c;
+}
+
+.cal-activity-technology {
+  background-color: #c5cae9;
+  border-left: 3px solid #3949ab;
+  color: #1a237e;
+}
+
+.cal-act-name {
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.cal-act-count {
+  font-size: 0.62rem;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
+/* Tooltip shown on hover */
+.cal-act-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
+  background: rgba(30, 30, 30, 0.96);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  width: 220px;
+  pointer-events: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.cal-activity:hover .cal-act-tooltip {
+  display: block;
+}
